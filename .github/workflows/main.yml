@@ -1,0 +1,61 @@
+name: Filebrowser docker image 
+
+on:
+  push:
+    branches:
+      - '**'
+    tags: [ 'v*' ]
+  pull_request:
+    branches:
+      - 'master'
+
+jobs:
+  generate-filebrowser-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine Build Environment
+        id: set-env
+        run: |
+          if ${{ github.event_name == 'push' && github.ref_name != 'master' }}; then
+            echo "DEV environment"
+            echo "ENV_VERSION=v10-dev" >> $GITHUB_ENV
+          elif ${{ github.event_name == 'pull_request' && github.base_ref == 'master' }}; then
+            echo "QA environment"
+            echo "ENV_VERSION=v10-qa" >> $GITHUB_ENV
+          elif ${{ github.event_name == 'push' && github.ref_name  == 'master'}}; then
+            echo "RC environment"
+            echo "ENV_VERSION=v10-rc" >> $GITHUB_ENV
+          elif ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}; then
+            echo "PROD environment"
+            echo "ENV_VERSION=v10" >> $GITHUB_ENV
+          fi
+      - name: Check out code into the right branch
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Build frontend
+        run: make build-frontend
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v4
+        with:
+          go-version: ^1.20
+        id: go
+      - name: Build Binary
+        run: go build -o "filebrowser" -v .
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: utmstack
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push the Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/utmstack/filebrowser/filebrowser:${{ env.ENV_VERSION }}
+      
