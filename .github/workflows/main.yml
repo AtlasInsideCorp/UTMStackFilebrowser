@@ -16,7 +16,7 @@ jobs:
       - name: Determine Build Environment
         id: set-env
         run: |
-          if ${{ github.event_name == 'push' && github.ref_name != 'master' }}; then
+          if ${{ github.event_name == 'push' && github.ref_name != 'master' && !startsWith(github.ref, 'refs/tags/v') }}; then
             echo "DEV environment"
             echo "ENV_VERSION=v10-dev" >> $GITHUB_ENV
           elif ${{ github.event_name == 'pull_request' && github.base_ref == 'master' }}; then
